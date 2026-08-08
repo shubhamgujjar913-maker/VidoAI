@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VidoAI - AI Video Generator</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#0b0f0d;
+  color:white;
+}
+.container{
+  max-width:700px;
+  margin:auto;
+  padding:25px 18px;
+}
+h1{
+  font-size:38px;
+  margin-bottom:5px;
+}
+.sub{
+  color:#aeb7b1;
+  margin-bottom:25px;
+}
+.card{
+  background:#121915;
+  border:1px solid #29362e;
+  border-radius:18px;
+  padding:20px;
+  margin-bottom:18px;
+}
+label{
+  display:block;
+  margin-bottom:9px;
+  font-weight:bold;
+}
+input[type=file],textarea{
+  width:100%;
+  background:#0b100d;
+  color:white;
+  border:1px solid #34443a;
+  border-radius:12px;
+  padding:14px;
+}
+textarea{
+  min-height:120px;
+  resize:vertical;
+}
+#preview{
+  width:100%;
+  max-height:400px;
+  object-fit:contain;
+  border-radius:14px;
+  display:none;
+  margin-top:15px;
+}
+button{
+  width:100%;
+  border:0;
+  border-radius:14px;
+  padding:16px;
+  font-size:17px;
+  font-weight:bold;
+  cursor:pointer;
+  background:#c7ff38;
+  color:#111;
+}
+button:disabled{
+  opacity:.5;
+}
+#status{
+  text-align:center;
+  color:#c7ff38;
+  margin:15px 0;
+}
+video{
+  width:100%;
+  border-radius:14px;
+  display:none;
+  background:#000;
+}
+.download{
+  display:none;
+  margin-top:12px;
+  text-align:center;
+  text-decoration:none;
+  background:#27352d;
+  color:#c7ff38;
+  padding:14px;
+  border-radius:12px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🎬 VidoAI</h1>
+<div class="sub">Turn your image into a cinematic video</div>
+
+<div class="card">
+<label>1. Choose Image</label>
+<input id="imageInput" type="file" accept="image/*">
+<img id="preview">
+</div>
+
+<div class="card">
+<label>2. Describe Your Video</label>
+<textarea id="prompt"
+placeholder="Example: A beautiful jungle with trees moving slowly in the wind, cinematic camera movement, golden sunlight..."></textarea>
+</div>
+
+<div class="card">
+<button id="generate">✨ Generate Video</button>
+<div id="status"></div>
+
+<video id="video" controls></video>
+<a id="download" class="download" download="vidoai-video.webm">
+⬇️ Download Video
+</a>
+</div>
+
+</div>
+
+<script>
+const imageInput = document.getElementById("imageInput");
+const preview = document.getElementById("preview");
+const generate = document.getElementById("generate");
+const status = document.getElementById("status");
+const video = document.getElementById("video");
+const download = document.getElementById("download");
+
+let image = new Image();
+
+imageInput.addEventListener("change", () => {
+  const file = imageInput.files[0];
+  if (!file) return;
+
+  const url = URL.createObjectURL(file);
+  preview.src = url;
+  preview.style.display = "block";
+  image.src = url;
+});
+
+generate.addEventListener("click", async () => {
+
+  if (!imageInput.files[0]) {
+    alert("Pehle image select karo.");
+    return;
+  }
+
+  const prompt = document.getElementById("prompt").value.trim();
+
+  if (!prompt) {
+    alert("Video ka prompt likho.");
+    return;
+  }
+
+  generate.disabled = true;
+  status.textContent = "⏳ Video ban rahi hai...";
+
+  await new Promise(r => setTimeout(r, 800));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 720;
+  canvas.height = 1280;
+
+  const ctx = canvas.getContext("2d");
+
+  const stream = canvas.captureStream(30);
+
+  let recorder;
+
+  try {
+    recorder = new MediaRecorder(stream, {
+      mimeType: "video/webm"
+    });
+  } catch(e) {
+    recorder = new MediaRecorder(stream);
+  }
+
+  const chunks = [];
+
+  recorder.ondataavailable = e => {
+    if (e.data.size > 0) chunks.push(e.data);
+  };
+
+  recorder.onstop = () => {
+
+    const blob = new Blob(chunks, {type:"video/webm"});
+    const url = URL.createObjectURL(blob);
+
+    video.src = url;
+    video.style.display = "block";
+
+    download.href = url;
+    download.style.display = "block";
+
+    status.textContent = "✅ Video ready!";
+    generate.disabled = false;
+  };
+
+  image.onload = () => {
+
+    recorder.start();
+
+    const start = performance.now();
+    const duration = 6000;
+
+    function animate(now) {
+
+      const progress = Math.min((now - start) / duration, 1);
+
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      const scale = 1 + progress * 0.12;
+
+      const w = canvas.width * scale;
+      const h = canvas.height * scale;
+
+      const x = (canvas.width - w) / 2;
+      const y = (canvas.height - h) / 2;
+
+      ctx.drawImage(image,x,y,w,h);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        recorder.stop();
+      }
+    }
+
+    requestAnimationFrame(animate);
+  };
+
+  image.src = URL.createObjectURL(imageInput.files[0]);
+});
+</script>
+
+</body>
+</html>
